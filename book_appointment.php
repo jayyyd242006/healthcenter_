@@ -54,7 +54,7 @@ $doctors = $conn->query("
     ORDER BY d.specialty, u.full_name
 ");
 
-// ── Fetch upcoming schedules ──
+// ── Fetch all schedules (Removed date restrictions so users can pick any existing schedules) ──
 $schedules = $conn->query("
     SELECT s.schedule_id, s.doctor_id, s.schedule_date, s.start_time, s.end_time,
            s.slot_duration, s.max_patients,
@@ -64,7 +64,7 @@ $schedules = $conn->query("
     FROM schedules s
     JOIN doctors d ON s.doctor_id = d.doctor_id
     JOIN users u   ON d.user_id   = u.user_id
-    WHERE s.schedule_date >= CURDATE() AND s.is_open = 1
+    WHERE s.is_open = 1
     ORDER BY s.schedule_date ASC, s.start_time ASC
 ");
 
@@ -130,7 +130,6 @@ $active_page = 'book';
 
     <form method="POST" id="bookingForm">
 
-      <!-- STEP 1: CHOOSE DOCTOR -->
       <div class="card" style="margin-bottom:20px;">
         <div class="card-header">
           <div>
@@ -152,7 +151,6 @@ $active_page = 'book';
         </div>
       </div>
 
-      <!-- STEP 2: CHOOSE SCHEDULE -->
       <div class="card" style="margin-bottom:20px;">
         <div class="card-header">
           <div>
@@ -194,7 +192,6 @@ $active_page = 'book';
         </div>
       </div>
 
-      <!-- STEP 3: REASON -->
       <div class="card" style="margin-bottom:20px;">
         <div class="card-header">
           <div>
@@ -238,4 +235,4 @@ function selectSchedule(id, date, time, el) {
 }
 </script>
 </body>
-</html>     
+</html>
