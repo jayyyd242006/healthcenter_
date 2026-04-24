@@ -10,6 +10,28 @@ if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== tru
 $success = '';
 $error   = '';
 
+// ── Delete patient ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_patient'])) {
+    $delete_uid = (int) $_POST['user_id'];
+    
+    // Attempt to safely delete related data first to prevent foreign key constraint errors
+    $p_res = $conn->query("SELECT patient_id FROM patients WHERE user_id = $delete_uid");
+    if ($p_res && $p_res->num_rows > 0) {
+        $pid = $p_res->fetch_assoc()['patient_id'];
+        $conn->query("DELETE FROM appointments WHERE patient_id = $pid");
+        $conn->query("DELETE FROM patients WHERE user_id = $delete_uid");
+    }
+    
+    $stmt = $conn->prepare("DELETE FROM users WHERE user_id = ?");
+    $stmt->bind_param("i", $delete_uid);
+    
+    if ($stmt->execute()) {
+        $success = "Patient deleted successfully.";
+    } else {
+        $error = "Failed to delete patient. Ensure all dependencies are clear.";
+    }
+}
+
 // ── Add new patient ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['new_patient'])) {
     $name    = trim($_POST['full_name']);
@@ -102,6 +124,8 @@ $active_page = 'patients';
     .form-group input:focus, .form-group select:focus { border-color:var(--green-light); }
     .avatar { width:34px; height:34px; border-radius:50%; background:var(--green-deep); color:white; display:inline-flex; align-items:center; justify-content:center; font-size:0.8rem; font-weight:700; flex-shrink:0; }
     .patient-name-cell { display:flex; align-items:center; gap:10px; }
+    .btn-delete { color:var(--error-text); border-color:var(--error-border); }
+    .btn-delete:hover { background:var(--error-bg); opacity: 1; }
   </style>
 </head>
 <body>
@@ -126,14 +150,12 @@ $active_page = 'patients';
       <div class="alert alert-error" style="margin-bottom:16px;">⚠️ <?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
 
-    <!-- SEARCH -->
     <form method="GET" class="filter-bar">
       <input type="text" name="search" placeholder="🔍 Search by name, email or phone..." value="<?= htmlspecialchars($search) ?>"/>
       <button type="submit" class="btn">Search</button>
       <?php if ($search): ?><a href="patients.php" class="btn btn-outline">Clear</a><?php endif; ?>
     </form>
 
-    <!-- TABLE -->
     <div class="card">
       <div class="card-header">
         <div class="card-title">All Patients</div>
@@ -173,10 +195,16 @@ $active_page = 'patients';
                   <td><?= $row['blood_type'] ?? '—' ?></td>
                   <td style="text-align:center;"><?= $row['appt_count'] ?></td>
                   <td><?= date('M j, Y', strtotime($row['created_at'])) ?></td>
-                  <td>
-                    <a href="appointments.php?search=<?= urlencode($row['full_name']) ?>" class="btn btn-outline" style="font-size:0.78rem;padding:4px 10px;">
+                  <td style="white-space: nowrap;">
+                    <a href="appointments.php?search=<?= urlencode($row['full_name']) ?>" class="btn btn-outline" style="font-size:0.78rem;padding:4px 10px; margin-right: 4px;">
                       View Appts
                     </a>
+                    <form method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this patient? All related records will also be removed. This cannot be undone.');">
+                      <input type="hidden" name="user_id" value="<?= $row['user_id'] ?>">
+                      <button type="submit" name="delete_patient" class="btn btn-outline btn-delete" style="font-size:0.78rem;padding:4px 10px;">
+                        Delete
+                      </button>
+                    </form>
                   </td>
                 </tr>
               <?php endwhile; endif; ?>
@@ -189,7 +217,6 @@ $active_page = 'patients';
   </div>
 </div>
 
-<!-- ADD PATIENT MODAL -->
 <div class="modal-overlay <?= $show_form ? 'open' : '' ?>" id="newModal">
   <div class="modal">
     <h2>➕ Add New Patient</h2>
